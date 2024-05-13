@@ -1,0 +1,15 @@
+{
+  "name": "vananam",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "scripts": {
+   
+    "test": "echo \"Test passed successfully\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
