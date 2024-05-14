@@ -1,0 +1,82 @@
+pipeline {
+    agent any
+    
+    environment {
+        currentCommitId = ''
+        previousImage = ''
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/Apoorv3591/jenkins-local']]])
+            }
+        }
+
+        stage('Get Previous Image Tag') {
+            steps {
+                script {
+                    
+                    try{
+                    previousImage = sh(script: "docker inspect --format='{{index .Config.Image}}' my-node-app", returnStdout: true).trim()
+                    echo "Previous image tag: ${previousImage}"
+                    }
+                    catch(Exception e)
+                    {
+                        echo "no container running , starting application with stable code"
+                        sh "docker run -d --name my-node-app -p 8080:3000 my-node-app:eb29563"
+                        previousImage = 'eb29563'
+                        
+                    }
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    currentCommitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    echo "Current Commit ID: ${currentCommitId}"
+                    sh "docker build -t my-node-app:${currentCommitId} ."
+                }
+            }
+        }
+
+        stage('Deploy Docker Image') {
+            steps {
+                script {
+                    echo "Current ID: ${currentCommitId}"
+                    sh 'docker stop my-node-app || true'
+                    sh 'docker rm my-node-app || true'
+                    echo "About to start docker"
+                    sh "docker run -d --name my-node-app -p 8080:3000 my-node-app:${currentCommitId}"
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            steps {
+                script {
+                    echo "sh test cases"
+                }
+            }
+        }
+        
+    }
+    
+    post {
+        success {
+            echo "Pipeline succeeded!"
+        }
+        failure {
+            echo "Pipeline failed!"
+            script {
+                echo "Rolling back deployment..."
+                sh 'docker stop my-node-app || true'
+                sh 'docker rm my-node-app || true'
+                echo "Previous image: ${previousImage}"
+                sh "docker run -d --name my-node-app -p 8080:3000 ${previousImage}"
+            }
+        }
+    }
+}
